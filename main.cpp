@@ -14,7 +14,8 @@
 struct AudioConfig                      //Structure to hold all the audio parameters
 {
     unsigned int sample_rate;
-    unsigned int channels;
+    unsigned int capture_channels;      //taking seperate channel as soundcard is asymmetric
+    unsigned int playback_channels;
     snd_pcm_format_t format;
     snd_pcm_uframes_t period_size;
     unsigned int periods;
@@ -99,16 +100,17 @@ int main()
 {
     AudioConfig config {                //Defining Audio configuration
         48000,                          //sample_rate
-        2,                              //channel = mono (set 2 for stereo)
-        SND_PCM_FORMAT_S24_3LE,          //format = 24 bit
-        6000,                           //period_size
+        1,                              //capture = mono
+        2,                              //playback = stereo
+        SND_PCM_FORMAT_S16_LE,          //format = 24 bit
+        512,                           //period_size
         4,                              //periods
     };
 
     int bytes_per_sample = snd_pcm_format_physical_width(config.format) / 8;
 
-    CircularBuffer audio_buffer(8, config.period_size * config.channels, config.channels);  //buffer for playback
-    CircularBuffer write_buffer(8, config.period_size * config.channels, config.channels);  //buffer for writing to output file 
+    CircularBuffer audio_buffer(8, config.period_size * config.capture_channels, config.capture_channels);  //buffer for playback
+    CircularBuffer write_buffer(8, config.period_size * config.capture_channels, config.capture_channels);  //buffer for writing to output file 
 
     // ----------------------- Open ALSA device -----------------------
 
@@ -148,7 +150,7 @@ int main()
     // ----------------------- Configure capture hardware -----------------------
     snd_pcm_hw_params_set_access(capture_handle, params_capture, SND_PCM_ACCESS_RW_INTERLEAVED);    //Interleaved means stereo is stored LRLRLR
     snd_pcm_hw_params_set_format(capture_handle, params_capture, config.format);
-    snd_pcm_hw_params_set_channels(capture_handle, params_capture, config.channels);
+    snd_pcm_hw_params_set_channels(capture_handle, params_capture, config.capture_channels);
     snd_pcm_hw_params_set_rate_near(capture_handle, params_capture, &config.sample_rate, &dir);
     snd_pcm_hw_params_set_period_size_near(capture_handle, params_capture, &config.period_size, &dir);
 
@@ -165,16 +167,16 @@ int main()
 
     snd_pcm_hw_params_get_rate(params_capture, &config.sample_rate, &dir);
     snd_pcm_hw_params_get_period_size(params_capture, &config.period_size, &dir);
-    snd_pcm_hw_params_get_channels(params_capture, &config.channels);
+    snd_pcm_hw_params_get_channels(params_capture, &config.capture_channels);
 
     std::cout << "Actual Capture Params - Rate: " << config.sample_rate
               << " Period: " << config.period_size
-              << " Channels: " << config.channels << "\n";         //Printing actual capture parameters
+              << " Channels: " << config.capture_channels << "\n";         //Printing actual capture parameters
 
     // ----------------------- Configure playback hardware -----------------------
     snd_pcm_hw_params_set_access(playback_handle, params_playback, SND_PCM_ACCESS_RW_INTERLEAVED);    //Interleaved means stereo is stored LRLRLR
     snd_pcm_hw_params_set_format(playback_handle, params_playback, config.format);
-    snd_pcm_hw_params_set_channels(playback_handle, params_playback, config.channels);
+    snd_pcm_hw_params_set_channels(playback_handle, params_playback, config.playback_channels);
     snd_pcm_hw_params_set_rate_near(playback_handle, params_playback, &config.sample_rate, &dir);
     snd_pcm_hw_params_set_period_size_near(playback_handle, params_playback, &config.period_size, &dir);
 
@@ -188,14 +190,20 @@ int main()
         return 1;
     }
 
-    err = snd_pcm_link(capture_handle, playback_handle);        //creating a link b/w capture and playback
+    /*err = snd_pcm_link(capture_handle, playback_handle);        //creating a link b/w capture and playback
 
     if (err < 0)
     {
         std::cerr << "Cannot link PCMs\n";
     }
 
+    snd_pcm_start(capture_handle);*/
+
+    // no link — asymmetric channels prevent linking
+    snd_pcm_prepare(capture_handle);
+    snd_pcm_prepare(playback_handle);
     snd_pcm_start(capture_handle);
+    snd_pcm_start(playback_handle);
 
     //Printing actual playback parameters
     unsigned int pb_rate;
@@ -213,7 +221,7 @@ int main()
     if (pb_rate != config.sample_rate || pb_period != config.period_size)
         std::cerr << "WARNING: capture/playback params mismatch — expect drift\n";
 
-    std::vector<int16_t> buffer(config.period_size * config.channels);  //creating audio buffer
+    std::vector<int16_t> buffer(config.period_size * config.capture_channels);  //creating audio buffer
 
     // ----------------------- Open WAV file -----------------------
     auto now = std::chrono::system_clock::now();                //timestamped file name
@@ -249,10 +257,13 @@ int main()
     // ----------------------- Recording loop -----------------------
     
     std::thread capture_thread([&]() {
-    std::vector<int16_t> local_buffer(config.period_size * config.channels);    //creating a local buffer for this loop
+    std::vector<int16_t> local_buffer(config.period_size * config.capture_channels);    //creating a local buffer for this loop
     while (recording)
     {
         int frames_read = snd_pcm_readi(capture_handle, local_buffer.data(), config.period_size); //reading from ALSA
+
+        //DEBUG
+        //std::cout << "frames_read: " << frames_read << "\n";
 
         if (frames_read == -EPIPE)              //handling buffer overrun
         {
@@ -310,8 +321,18 @@ int main()
             continue;
         }
         
-        int frames_written = snd_pcm_writei(playback_handle, chunk.data.data(), frames);    //writes to ALSA
+        //int frames_written = snd_pcm_writei(playback_handle, chunk.data.data(), frames);    //writes to ALSA
+        
+        // upmix mono to stereo — duplicate each sample to both L and R channels
+        std::vector<int16_t> stereo_buffer(frames * 2);
+        for (int i = 0; i < frames; i++)
+        {
+            stereo_buffer[i * 2]     = chunk.data[i];   // left
+            stereo_buffer[i * 2 + 1] = chunk.data[i];   // right
+        }
 
+        int frames_written = snd_pcm_writei(playback_handle, stereo_buffer.data(), frames);
+        
         if (frames_written == -EPIPE)               //Underrun condition, speaker ran out of data
         {
             snd_pcm_prepare(playback_handle);
@@ -336,7 +357,7 @@ int main()
                 continue;
         }
 
-        size_t bytes = chunk.frames * config.channels * bytes_per_sample;
+        size_t bytes = chunk.frames * config.capture_channels * bytes_per_sample;
         file.write(reinterpret_cast<char*>(chunk.data.data()), bytes);
         total_data_bytes += bytes;
     }
@@ -352,7 +373,7 @@ int main()
     write_wav_header(
     file,
     config.sample_rate,
-    config.channels,
+    config.capture_channels,
     bytes_per_sample * 8,
     total_data_bytes);
 
