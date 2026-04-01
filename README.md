@@ -49,7 +49,7 @@ Work in progress. Current state:
 - [x] 3-thread pipeline with circular buffer
 - [x] WAV file output with timestamped filenames
 - [x] xrun recovery
-- [ ] USB sound card integration and testing
+- [x] USB sound card integration and testing
 - [ ] Piezo envelope detection and mic blending DSP
 - [ ] WM8960 I2S HAT integration
 - [ ] GPIO button for start/stop
