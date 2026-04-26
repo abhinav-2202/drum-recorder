@@ -1,0 +1,22 @@
+# Build artifacts
+*.o
+*.a
+*.so
+drumrecorder
+
+# Audio output files
+*.wav
+
+# IDE / editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
