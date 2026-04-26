@@ -15,11 +15,12 @@ Piezo (snare trigger) ─────────┘                            
                                                             └──► Real-time Playback
 ```
 
-3 concurrent threads coordinated via condition variables and a shared circular buffer:
+Multi threaded design coordinated via condition variables and a shared circular buffer:
 
 * **Capture thread** - reads raw PCM frames from the ALSA hardware device, driven by hardware timing
 * **Playback thread** - pulls frames for real-time output monitoring 
 * **Write thread** - independently writes frames to a timestamped WAV file, decoupling slow disk I/O from the audio path
+* **Input thread** — handles keyboard input for stopping the recording, kept separate from the audio threads to avoid stdin blocking causing underruns
 
 ## Hardware
 
