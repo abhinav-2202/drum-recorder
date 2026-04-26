@@ -17,9 +17,9 @@ Piezo (snare trigger) ─────────┘                            
 
 3 concurrent threads coordinated via condition variables and a shared circular buffer:
 
-* **Capture thread** — reads raw PCM frames from the ALSA hardware device, driven by hardware timing
-* **Playback thread** — pulls frames for real-time monitoring output
-* **Write thread** — independently writes frames to a timestamped WAV file, decoupling slow disk I/O from the audio path
+* **Capture thread** - reads raw PCM frames from the ALSA hardware device, driven by hardware timing
+* **Playback thread** - pulls frames for real-time output monitoring 
+* **Write thread** - independently writes frames to a timestamped WAV file, decoupling slow disk I/O from the audio path
 
 ## Hardware
 
@@ -74,4 +74,4 @@ While testing with a PreSonus AudioBox USB, I found the device only advertised t
 
 ## Why I Built This
 
-I'm a drummer. Commercial multi-track drum recording solutions (like the Yamaha EAD10) cost ₹40k+. I wanted something at a fraction of that price, built around hardware accessible to amateur drummers. This is also a deep-dive into embedded Linux audio for me.
+I'm a drummer. Commercial multi-track drum recording solutions (like the Yamaha EAD10) cost ₹40k+. I wanted something at a fraction of that price, built around hardware, accessible to amateur drummers. This is also a deep-dive into embedded Linux audio for me.
