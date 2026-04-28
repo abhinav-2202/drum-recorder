@@ -73,6 +73,8 @@ Debugging this project led directly to a merged patch in the mainline Linux kern
 
 While testing with a PreSonus AudioBox USB, I found the device only advertised the S24_3LE format and had no entry in the kernel's USB audio quirks table. The patch adds an entry to `sound/usb/quirks-table.h` and was reviewed and accepted by Takashi Iwai, the ALSA subsystem maintainer.
 
+A v2 patch correcting placement is in review on the mailing list.
+
 ## Why I Built This
 
 I'm a drummer. Commercial multi-track drum recording solutions (like the Yamaha EAD10) cost ₹40k+. I wanted something at a fraction of that price, built around hardware, accessible to amateur drummers. This is also a deep-dive into embedded Linux audio for me.
