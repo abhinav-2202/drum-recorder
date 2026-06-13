@@ -15,11 +15,12 @@ Piezo (snare trigger) ─────────┘                            
                                                             └──► Real-time Playback
 ```
 
-3 concurrent threads coordinated via condition variables and a shared circular buffer:
+Multi threaded design coordinated via condition variables and a shared circular buffer:
 
 * **Capture thread** - reads raw PCM frames from the ALSA hardware device, driven by hardware timing
 * **Playback thread** - pulls frames for real-time output monitoring 
 * **Write thread** - independently writes frames to a timestamped WAV file, decoupling slow disk I/O from the audio path
+* **Input thread** — handles keyboard input for stopping the recording, kept separate from the audio threads to avoid stdin blocking causing underruns
 
 ## Hardware
 
@@ -71,6 +72,8 @@ Debugging this project led directly to a merged patch in the mainline Linux kern
 > [ALSA: usb-audio: Add quirk for PreSonus AudioBox USB (0x194f:0x0301)](https://lore.kernel.org/linux-sound/20260410143335.5974-1-abhi220204@gmail.com/)
 
 While testing with a PreSonus AudioBox USB, I found the device only advertised the S24_3LE format and had no entry in the kernel's USB audio quirks table. The patch adds an entry to `sound/usb/quirks-table.h` and was reviewed and accepted by Takashi Iwai, the ALSA subsystem maintainer.
+
+A v2 patch correcting placement is in review on the mailing list.
 
 ## Why I Built This
 
